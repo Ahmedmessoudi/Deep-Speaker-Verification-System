@@ -93,3 +93,8 @@ speaker_db.json
 
 # Test data
 test_pairs.txt
+
+# Dataset Archives
+Musan.zip
+Voxceleb/
+Voxceleb*.zip

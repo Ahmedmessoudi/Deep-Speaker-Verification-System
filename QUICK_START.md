@@ -9,9 +9,31 @@ cd speaker_verification
 pip install -r requirements.txt
 ```
 
-### 2. Download Sample Data
+### 2. Download and Extract Data
 
-For testing purposes, you can use a subset of VoxCeleb or create dummy data.
+For testing purposes, you can use a subset of VoxCeleb and MUSAN. Ensure your directory structure maps exactly as follows:
+
+**VoxCeleb Data Structure:**
+```text
+data/raw/
+├── train/
+│   └── wav/
+│       ├── id00001/
+│       │   ├── 1hGFSqVJUO4/
+│       │   │   └── 00000.wav
+│       │   └── ...
+│       └── ...
+├── val/
+└── test/
+```
+
+**MUSAN Data Structure (for augmentation):**
+```text
+data/musan/
+├── noise/
+├── music/
+└── babble/
+```
 
 ### 3. Configure System
 
