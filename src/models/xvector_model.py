@@ -100,7 +100,7 @@ class StatsPooling(nn.Module):
         """
         # Compute mean and std over time
         mean = torch.mean(x, dim=2)  # (batch_size, input_dim)
-        std = torch.std(x, dim=2)    # (batch_size, input_dim)
+        std = torch.std(x, dim=2, unbiased=False)    # (batch_size, input_dim)
         
         # Concatenate
         output = torch.cat([mean, std], dim=1)  # (batch_size, 2 * input_dim)
@@ -150,13 +150,13 @@ class XVector(nn.Module):
         self.tdnn2 = TDNN(tdnn_dim, tdnn_dim, kernel_size=3, dilation=2, dropout_rate=dropout_rate)
         self.tdnn3 = TDNN(tdnn_dim, tdnn_dim, kernel_size=3, dilation=3, dropout_rate=dropout_rate)
         self.tdnn4 = TDNN(tdnn_dim, tdnn_dim, kernel_size=1, dilation=1, dropout_rate=dropout_rate)
-        self.tdnn5 = TDNN(tdnn_dim, 1024, kernel_size=1, dilation=1, dropout_rate=dropout_rate)
+        self.tdnn5 = TDNN(tdnn_dim, tdnn_dim, kernel_size=1, dilation=1, dropout_rate=dropout_rate)
         
         # Stats pooling
-        self.stats_pool = StatsPooling(1024)
+        self.stats_pool = StatsPooling(tdnn_dim)
         
         # Feed-forward layers
-        self.fc1 = nn.Linear(1024 * 2, embeddings_dim)
+        self.fc1 = nn.Linear(tdnn_dim * 2, embeddings_dim)
         self.bn_fc1 = nn.BatchNorm1d(embeddings_dim)
         self.fc2 = nn.Linear(embeddings_dim, embeddings_dim)
         self.bn_fc2 = nn.BatchNorm1d(embeddings_dim)

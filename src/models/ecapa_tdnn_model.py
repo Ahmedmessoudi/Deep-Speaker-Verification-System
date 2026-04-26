@@ -282,7 +282,7 @@ class ECAPATDNN(nn.Module):
         
         # Global statistics
         mean = torch.mean(x, dim=2)
-        std = torch.std(x, dim=2)
+        std = torch.std(x, dim=2, unbiased=False)
         x = torch.cat([mean, std], dim=1)
         
         # Embedding
@@ -324,7 +324,7 @@ class AdaptiveStdPool1d(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Compute std over time."""
         mean = self.avg_pool(x)
-        return torch.std(x, dim=2, keepdim=True)
+        return torch.std(x, dim=2, keepdim=True, unbiased=False)
 
 
 # Add to nn module for convenience
