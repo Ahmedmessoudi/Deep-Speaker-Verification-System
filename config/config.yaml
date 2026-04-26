@@ -74,3 +74,6 @@ logging:
 
 # Random Seed
 seed: 42
+
+
+#Note for me : change the Pytorch in the envirement to the version that supprts the gpu processing, and also change the cuda version to the one that is compatible with the Pytorch version.

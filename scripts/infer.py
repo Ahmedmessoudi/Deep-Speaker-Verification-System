@@ -2,10 +2,15 @@
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 import torch
 import yaml
+
+# Add project root to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data import AudioPreprocessor
 from src.models import ECAPATDNN, XVector
@@ -94,12 +99,8 @@ def main():
         
         features1 = preprocessor(args.audio1)
         features2 = preprocessor(args.audio2)
-        
-        import torch
-        feat1_tensor = torch.FloatTensor(features1).unsqueeze(0)
-        feat2_tensor = torch.FloatTensor(features2).unsqueeze(0)
-        
-        similarity, is_same = verifier.verify(feat1_tensor, feat2_tensor, args.threshold)
+
+        similarity, is_same = verifier.verify(features1, features2, args.threshold)
         
         logger.info(f"Similarity score: {similarity:.4f}")
         logger.info(f"Same speaker: {is_same}")
@@ -113,7 +114,6 @@ def main():
         
         features = preprocessor(args.audio1)
         
-        import torch
         features_tensor = torch.FloatTensor(features).unsqueeze(0)
         embedding = model.extract_embedding(features_tensor)
         embedding = embedding.detach().cpu().numpy()[0]
