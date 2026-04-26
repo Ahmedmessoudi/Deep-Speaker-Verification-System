@@ -38,32 +38,44 @@ class SEResBlock(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.scale = scale
+        if out_channels % scale != 0:
+            raise ValueError(
+                f"out_channels ({out_channels}) must be divisible by scale ({scale})"
+            )
+        self.width = out_channels // scale
         
-        # Calculate padding
-        padding = (kernel_size - 1) * dilation // 2
-        
-        # Branches for Res2Block
+        # Pointwise projection before Res2Net-style split processing
+        self.pre_conv = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU()
+        )
+
+        # Branches for Res2Net-style processing
         self.branches = nn.ModuleList()
-        branch_out = out_channels // scale
-        
-        for i in range(scale):
-            dil = dilation * (i + 1)
-            pad = (kernel_size - 1) * dil // 2
-            
+        for _ in range(scale - 1):
+            pad = (kernel_size - 1) * dilation // 2
+
             branch = nn.Sequential(
                 nn.Conv1d(
-                    in_channels if i == 0 else branch_out,
-                    branch_out,
+                    self.width,
+                    self.width,
                     kernel_size=kernel_size,
-                    dilation=dil,
+                    dilation=dilation,
                     padding=pad,
                     bias=False
                 ),
-                nn.BatchNorm1d(branch_out),
+                nn.BatchNorm1d(self.width),
                 nn.ReLU(),
                 nn.Dropout(dropout_rate)
             )
             self.branches.append(branch)
+
+        self.post_conv = nn.Sequential(
+            nn.Conv1d(out_channels, out_channels, kernel_size=1, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU()
+        )
         
         # Squeeze-and-Excitation
         self.se_conv1 = nn.Conv1d(out_channels, out_channels // 2, 1)
@@ -87,15 +99,24 @@ class SEResBlock(nn.Module):
         Returns:
             Output tensor (batch_size, out_channels, time_steps)
         """
-        batch_size, _, time_steps = x.size()
-        
-        # Branch forward
-        output = None
-        for i, branch in enumerate(self.branches):
-            if i == 0:
-                output = branch(x)
-            else:
-                output = output + branch(output)
+        # Pre-projection and split into scale chunks
+        x_proj = self.pre_conv(x)
+        splits = torch.split(x_proj, self.width, dim=1)
+
+        # Res2Net-style hierarchical aggregation across splits
+        branch_outputs = [splits[0]]
+        if self.scale > 1:
+            prev = None
+            for i, branch in enumerate(self.branches):
+                if i == 0:
+                    cur = branch(splits[1])
+                else:
+                    cur = branch(splits[i + 1] + prev)
+                branch_outputs.append(cur)
+                prev = cur
+
+        output = torch.cat(branch_outputs, dim=1)
+        output = self.post_conv(output)
         
         # Squeeze-and-Excitation
         se = torch.mean(output, dim=2, keepdim=True)  # Global average pooling
@@ -191,7 +212,7 @@ class ECAPATDNN(nn.Module):
         
         # Context gating
         self.context_gate_conv = nn.Sequential(
-            nn.Conv1d(num_channels * 3 * 4, 128, 1),
+            nn.Conv1d(num_channels * 3 * 2, 128, 1),
             nn.ReLU(),
             nn.Conv1d(128, num_channels * 3, 1),
             nn.Sigmoid()

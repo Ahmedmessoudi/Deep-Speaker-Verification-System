@@ -204,6 +204,7 @@ class VoxCelebDataLoader:
         batch_size: int = 64,
         shuffle: bool = True,
         num_workers: int = 4,
+        pin_memory: Optional[bool] = None,
         augmentation_prob: float = 0.5,
         augmentation_config: Optional[Dict] = None,
         max_samples: Optional[int] = None
@@ -216,6 +217,7 @@ class VoxCelebDataLoader:
             batch_size: Batch size
             shuffle: Whether to shuffle
             num_workers: Number of workers
+            pin_memory: Whether to pin host memory (auto if None)
             augmentation_prob: Probability of augmentation
             augmentation_config: Augmentation configuration
             max_samples: Maximum number of samples to load (None = all)
@@ -229,13 +231,16 @@ class VoxCelebDataLoader:
             augmentation_config=augmentation_config,
             max_samples=max_samples
         )
+
+        if pin_memory is None:
+            pin_memory = torch.cuda.is_available()
         
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=num_workers,
-            pin_memory=True,
+            pin_memory=pin_memory,
             collate_fn=collate_variable_length_batch
         )
         
