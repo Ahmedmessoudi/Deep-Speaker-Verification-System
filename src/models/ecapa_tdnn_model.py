@@ -221,9 +221,9 @@ class ECAPATDNN(nn.Module):
         Returns:
             Logits (batch_size, num_speakers) or embedding (batch_size, embeddings_dim)
         """
-        # Handle input shape
-        if x.dim() == 3 and x.shape[-1] != self.input_dim:
-            if x.shape[1] == self.input_dim:
+        # Handle input shape: ensure (batch, n_mels, time_steps)
+        if x.dim() == 3 and x.shape[1] != self.input_dim:
+            if x.shape[2] == self.input_dim:
                 x = x.transpose(1, 2)
         
         # Front-end

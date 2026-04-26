@@ -1,0 +1,78 @@
+# Speaker Verification System Configuration - MINI TEST MODE
+# This config is for local testing with a small subset of VoxCeleb data.
+# For full training, use config.yaml instead.
+
+# Data Configuration (points to mini dataset directories)
+data:
+  raw_path: "./data/raw_mini"
+  processed_path: "./data/processed_mini"
+  augmented_path: "./data/augmented_mini"
+  sample_rate: 16000
+  duration: 3.0  # seconds
+  n_fft: 512
+  hop_length: 160
+  n_mels: 80
+  f_min: 50
+  f_max: 7600
+
+# Augmentation Configuration
+augmentation:
+  enabled: true
+  noise_snr: [0, 10, 20]  # dB levels
+  musan_path: "./data/musan_mini"  # Mini MUSAN dataset path
+  prob: 0.5
+
+# Model Configuration (reduced num_speakers for mini set)
+model:
+  xvector:
+    input_dim: 80  # MFCC/Mel dimension
+    tdnn_dim: 512  # Reduced for faster local testing
+    num_speakers: 10  # Will be overridden by actual speaker count
+    embeddings_dim: 256
+
+  ecapa_tdnn:
+    input_dim: 80
+    num_channels: 512  # Reduced for faster local testing
+    kernel_size: 5
+    dilations: [1, 2, 3, 4]
+    num_speakers: 10  # Will be overridden by actual speaker count
+    embeddings_dim: 192
+
+# Training Configuration (lighter for local testing)
+training:
+  batch_size: 16
+  num_epochs: 10
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  loss_type: "aamsoftmax"  # Options: "crossentropy", "aamsoftmax"
+  margin: 0.2  # AAM-Softmax margin
+  scale: 30.0  # AAM-Softmax scale
+  optimizer: "adam"
+  scheduler: "cosine"
+  warmup_epochs: 2
+  early_stopping: true
+  patience: 5
+  gradient_clip: 5.0
+  device: "cpu"  # Default to CPU for local testing
+
+# Evaluation Configuration
+evaluation:
+  eer_threshold_range: [0.0, 1.0]
+  num_thresholds: 1000
+  backend: "cosine"  # Similarity backend
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  model_type: "ecapa_tdnn"  # Model to use in API
+
+# Logging
+logging:
+  level: "INFO"
+  log_file: "./logs/speaker_verification_mini.log"
+  tensorboard_dir: "./logs/tensorboard_mini"
+
+# Random Seed
+seed: 42

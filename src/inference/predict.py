@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .embedding_extractor import EmbeddingExtractor, CosineDistance
+from src.models.embedding_extractor import EmbeddingExtractor, CosineDistance
 
 
 class SpeakerVerificationInference:

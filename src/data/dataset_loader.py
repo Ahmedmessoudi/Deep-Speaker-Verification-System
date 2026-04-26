@@ -73,8 +73,8 @@ class SpeakerVerificationDataset(Dataset):
             # Check dimensions - if features is 2D, transpose to (time, features)
             # or keep as (features, time) for compatibility
             if y.ndim == 2:
-                # Transpose to (time_steps, n_features) for consistency
-                y_features = y.T  # Shape: (time_steps, n_mels)
+                # Keep as (n_features, time_steps) for Conv1d consistency
+                y_features = y
             else:
                 y_features = y
             
@@ -84,12 +84,9 @@ class SpeakerVerificationDataset(Dataset):
                 snr_values = self.augmentation_config.get("noise_snr", [10])
                 snr_db = np.random.choice(snr_values)
                 
-                # First convert features back to audio for augmentation
-                # This is a simplified approach - in practice you'd apply 
-                # augmentation to raw audio before feature extraction
-                y_features = y_features.T  # Back to (n_mels, time_steps)
                 # Apply augmentation to features directly (simplified)
-                y_features = y_features.T
+                # In a real scenario, you'd apply it to the waveform before extraction
+                pass
             
             # Convert to tensor
             features_tensor = torch.FloatTensor(y_features)
@@ -126,12 +123,17 @@ class VoxCelebDataLoader:
         self.preprocessor = preprocessor
         self.augmenter = augmenter
     
-    def load_file_list(self, split: str = "train") -> Tuple[List[str], List[int]]:
+    def load_file_list(
+        self,
+        split: str = "train",
+        max_samples: Optional[int] = None
+    ) -> Tuple[List[str], List[int]]:
         """
         Load file list for a split.
         
         Args:
             split: Data split (train, val, test)
+            max_samples: Maximum number of samples to return (None = all)
             
         Returns:
             Tuple of (audio_files, speaker_ids)
@@ -157,13 +159,19 @@ class VoxCelebDataLoader:
                 audio_files.append(str(audio_file))
                 speaker_ids.append(speaker_id)
         
+        # Limit samples if max_samples is specified
+        if max_samples is not None and len(audio_files) > max_samples:
+            audio_files = audio_files[:max_samples]
+            speaker_ids = speaker_ids[:max_samples]
+        
         return audio_files, speaker_ids
     
     def get_dataset(
         self,
         split: str = "train",
         augmentation_prob: float = 0.5,
-        augmentation_config: Optional[Dict] = None
+        augmentation_config: Optional[Dict] = None,
+        max_samples: Optional[int] = None
     ) -> SpeakerVerificationDataset:
         """
         Get PyTorch dataset for a split.
@@ -172,11 +180,12 @@ class VoxCelebDataLoader:
             split: Data split
             augmentation_prob: Probability of augmentation
             augmentation_config: Augmentation configuration
+            max_samples: Maximum number of samples to load (None = all)
             
         Returns:
             SpeakerVerificationDataset instance
         """
-        audio_files, speaker_ids = self.load_file_list(split)
+        audio_files, speaker_ids = self.load_file_list(split, max_samples=max_samples)
         
         dataset = SpeakerVerificationDataset(
             audio_files=audio_files,
@@ -196,7 +205,8 @@ class VoxCelebDataLoader:
         shuffle: bool = True,
         num_workers: int = 4,
         augmentation_prob: float = 0.5,
-        augmentation_config: Optional[Dict] = None
+        augmentation_config: Optional[Dict] = None,
+        max_samples: Optional[int] = None
     ) -> DataLoader:
         """
         Get PyTorch DataLoader for a split.
@@ -208,6 +218,7 @@ class VoxCelebDataLoader:
             num_workers: Number of workers
             augmentation_prob: Probability of augmentation
             augmentation_config: Augmentation configuration
+            max_samples: Maximum number of samples to load (None = all)
             
         Returns:
             PyTorch DataLoader
@@ -215,7 +226,8 @@ class VoxCelebDataLoader:
         dataset = self.get_dataset(
             split=split,
             augmentation_prob=augmentation_prob,
-            augmentation_config=augmentation_config
+            augmentation_config=augmentation_config,
+            max_samples=max_samples
         )
         
         dataloader = DataLoader(
@@ -223,7 +235,8 @@ class VoxCelebDataLoader:
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=num_workers,
-            pin_memory=True
+            pin_memory=True,
+            collate_fn=collate_variable_length_batch
         )
         
         return dataloader
@@ -241,14 +254,15 @@ def collate_variable_length_batch(batch: List[Tuple]) -> Tuple[torch.Tensor, tor
     """
     features_list, speaker_ids = zip(*batch)
     
-    # Find max length
-    max_length = max(f.shape[0] for f in features_list)
+    # Find max length (now in the second dimension)
+    max_length = max(f.shape[1] for f in features_list)
     
     # Pad sequences
     padded_features = []
     for features in features_list:
-        padding = max_length - features.shape[0]
-        padded = torch.nn.functional.pad(features, (0, 0, 0, padding))
+        padding = max_length - features.shape[1]
+        # Pad the last dimension (time)
+        padded = torch.nn.functional.pad(features, (0, padding))
         padded_features.append(padded)
     
     # Stack
