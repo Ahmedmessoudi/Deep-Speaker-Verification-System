@@ -1,4 +1,8 @@
+# PyTorch stack
+# Note: to install CUDA-enabled wheels, use the PyTorch index URL, e.g.
+# pip install --index-url https://download.pytorch.org/whl/cu121 -r requirements.txt
 torch>=2.0.0
+torchvision>=0.15.0
 torchaudio>=2.0.0
 speechbrain>=0.5.16
 librosa>=0.10.0

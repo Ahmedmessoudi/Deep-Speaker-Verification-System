@@ -23,6 +23,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=None, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=None, help="Learning rate")
+    parser.add_argument("--resume", type=str, default=None, help="Resume from checkpoint path")
     
     args = parser.parse_args()
     
@@ -130,6 +131,9 @@ def main():
     
     # Initialize trainer
     trainer = Trainer(model=model, device=device)
+    if args.resume:
+        logger.info(f"Resuming from checkpoint: {args.resume}")
+        trainer.load_checkpoint(args.resume)
     
     # Create output directory
     output_dir = Path(args.output_dir) / args.model
