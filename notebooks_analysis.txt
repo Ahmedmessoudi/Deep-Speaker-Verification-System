@@ -1,0 +1,245 @@
+﻿======== Notebook_1_X_Vector_Speaker_Verification_Finetuning.ipynb (15 cells) ========
+  [MARKDOWN cell 0]: # ­ƒÄñ Speaker Verification with Pre-trained X-Vector Fine-Tuning on Kaggle (2x T4 GPUs)
+
+This notebook implements the end-to-end pipeline for **fine-tuning a pre-trained X-Vector model** (from SpeechBrain) for Speaker Verification.
+
+### Pipeline Overview:
+1. **Environment Preparation**: Setup dependencies (including SpeechBrain) and configure dual GPU training.
+2. **Data Pipeline & Augmentation**: Scan VoxCeleb and MUSAN datasets recursively. The data loader returns raw audio waveforms, which are 
+  ---
+  [MARKDOWN cell 1]: ## ­ƒøá´©Å Step 1: Prepare Environment and Import Libraries
+  ---
+  [CODE cell 2]: # Install dependencies including speechbrain
+!pip install -q speechbrain torchaudio soundfile librosa matplotlib seaborn scikit-learn pandas numpy tqdm
+
+import os, re, sys, time, math, random, glob, gc
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, roc_curve, auc
+import soundfile as sf
+import 
+  ---
+  [MARKDOWN cell 3]: ## ­ƒöä Step 2: Auto-Discover Datasets, Preprocess, and Setup Augmentation
+  ---
+  [CODE cell 4]: import warnings
+warnings.filterwarnings('ignore')
+
+SR = 16000
+DURATION = 3
+NUM_SAMPLES = SR * DURATION
+BATCH_SIZE = 64
+NUM_WORKERS = 4
+
+# ============================================================
+# AUTO-DISCOVER DATASET PATHS
+# ============================================================
+INPUT_ROOT = '/kaggle/input'
+
+print('=' * 60)
+print('STEP 1: Discovering /kaggle/input/ structure')
+print('=' * 60)
+for ds in sorted(os.listdir(INPUT_ROOT)):
+    ds_path = os.path.join(INPUT_ROOT, ds)
+    if 
+  ---
+  [MARKDOWN cell 5]: ## ­ƒºá Step 3: Pre-trained X-Vector Fine-Tuning Wrapper
+We load the SpeechBrain pretrained X-Vector model and expose its sub-components (`compute_features`, `mean_var_norm`, and `embedding_model`) directly as a standard PyTorch trainable module, mapping its 512-dimensional embeddings to our classification head.
+  ---
+  [CODE cell 6]: from speechbrain.inference.speaker import EncoderClassifier
+
+print("Loading pretrained X-Vector weights from Hugging Face...")
+# Note: Requires internet access enabled inside Kaggle first-time to download. 
+# Subsequent runs will use the cached checkpoints.
+sb_classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", run_opts={"device": device})
+
+class PretrainedXVectorWrapper(nn.Module):
+    def __init__(self, classifier, num_classes=10, embedding_dim=512):
+       
+  ---
+  [MARKDOWN cell 7]: ## ­ƒôë Step 4: Training & Verification (F1-Score Optimization)
+Fine-tune the model using a lower learning rate (typical for transfer learning) and Cosine Annealing.
+  ---
+  [CODE cell 8]: EPOCHS = 10  # Fine-tuning requires far fewer epochs (e.g. 5-10) to achieve high convergence
+criterion = nn.CrossEntropyLoss()
+# Lower learning rate for fine-tuning pre-trained backbone
+optimizer = optim.AdamW(model.parameters(), lr=0.0001, weight_decay=1e-4)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
+
+def get_embedding(mdl, fp, dev):
+    mdl.eval()
+    try:
+        w, _ = librosa.load(fp, sr=16000)
+    except Exception:
+        w = np.zeros(48000, dtype=np.float32
+  ---
+  [MARKDOWN cell 9]: ## ­ƒôè Step 5: Test Set Evaluation & Visualization
+  ---
+  [CODE cell 10]: ckpt_path = 'checkpoints/xvector_finetune/best_model.pt'
+if os.path.exists(ckpt_path):
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    eval_model = PretrainedXVectorWrapper(sb_classifier, NUM_CLASSES, 512)
+    eval_model.load_state_dict(ckpt['model_state_dict'])
+    eval_model = eval_model.to(device)
+    opt_threshold = ckpt['optimal_threshold']
+    print(f'[RESTORED] Best model epoch {ckpt["epoch"]} restored. Threshold: {opt_threshold:.3f}')
+else:
+    eval_model = 
+  ---
+  [MARKDOWN cell 11]: ## ­ƒöè Step 5.5: Fixed SNR Noisy Audio Evaluation
+  ---
+  [CODE cell 12]: def eval_verif_noise(mdl, pairs, dev, snr_val):
+    mdl.eval()
+    sims, labs = [], []
+    cache = {}
+    for a, b, lb in tqdm(pairs, desc=f'Evaluating {snr_val}dB'):
+        for f in [a, b]:
+            if f not in cache:
+                try:
+                    w, _ = librosa.load(f, sr=16000)
+                except Exception:
+                    w = np.zeros(48000, dtype=np.float32)
+                ns = 48000
+                if len(w) < ns: w = np.pad(w, (0, ns-len(w)))
+                else: 
+  ---
+  [MARKDOWN cell 13]: ## ­ƒÆ¥ Step 6: Export Model for Comparison
+  ---
+  [CODE cell 14]: torch.save({
+    'model_architecture': 'PretrainedXVectorWrapper',
+    'embedding_dim': 512, 'num_classes': NUM_CLASSES,
+    'optimal_threshold': opt_threshold,
+    'model_state_dict': eval_model.state_dict(),
+    'spk_to_label': spk_to_label, 'label_to_spk': label_to_spk,
+    'test_metrics': {'f1_score':tf1, 'eer':tr['eer'], 'accuracy':tacc,
+                     'precision':tprec, 'recall':trec, 'auc':tauc}
+}, 'results/xvector_final_model.pt', weights_only=False)
+print('[SUCCESS] Fine-tuned X-V
+  ---
+======== Notebook_2_ECAPA_TDNN_Speaker_Verification_Finetuning.ipynb (15 cells) ========
+  [MARKDOWN cell 0]: # ­ƒÄñ Speaker Verification with Pre-trained ECAPA-TDNN Fine-Tuning on Kaggle (2x T4 GPUs)
+
+This notebook implements the end-to-end pipeline for **fine-tuning a pre-trained ECAPA-TDNN model** (from SpeechBrain) for Speaker Verification.
+
+### Pipeline Overview:
+1. **Environment Preparation**: Setup dependencies (including SpeechBrain) and configure dual GPU training.
+2. **Data Pipeline & Augmentation**: Scan VoxCeleb and MUSAN datasets recursively. The data loader returns raw audio waveforms, which 
+  ---
+  [MARKDOWN cell 1]: ## ­ƒøá´©Å Step 1: Prepare Environment and Import Libraries
+  ---
+  [CODE cell 2]: # Install dependencies including speechbrain
+!pip install -q speechbrain torchaudio soundfile librosa matplotlib seaborn scikit-learn pandas numpy tqdm
+
+import os, re, sys, time, math, random, glob, gc
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, roc_curve, auc
+import soundfile as sf
+import 
+  ---
+  [MARKDOWN cell 3]: ## ­ƒöä Step 2: Auto-Discover Datasets, Preprocess, and Setup Augmentation
+  ---
+  [CODE cell 4]: import warnings
+warnings.filterwarnings('ignore')
+
+SR = 16000
+DURATION = 3
+NUM_SAMPLES = SR * DURATION
+BATCH_SIZE = 64
+NUM_WORKERS = 4
+
+# ============================================================
+# AUTO-DISCOVER DATASET PATHS
+# ============================================================
+INPUT_ROOT = '/kaggle/input'
+
+print('=' * 60)
+print('STEP 1: Discovering /kaggle/input/ structure')
+print('=' * 60)
+for ds in sorted(os.listdir(INPUT_ROOT)):
+    ds_path = os.path.join(INPUT_ROOT, ds)
+    if 
+  ---
+  [MARKDOWN cell 5]: ## ­ƒºá Step 3: Pre-trained ECAPA-TDNN Fine-Tuning Wrapper
+We load the SpeechBrain pretrained ECAPA-TDNN model and expose its sub-components directly as a trainable module, mapping its 192-dimensional embeddings to our classification head.
+  ---
+  [CODE cell 6]: from speechbrain.inference.speaker import EncoderClassifier
+
+print("Loading pretrained ECAPA-TDNN weights from Hugging Face...")
+# Note: Requires internet access enabled inside Kaggle first-time to download. 
+sb_classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb", run_opts={"device": device})
+
+class PretrainedECAPAWrapper(nn.Module):
+    def __init__(self, classifier, num_classes=10, embedding_dim=192):
+        super().__init__()
+        # Extract modules from 
+  ---
+  [MARKDOWN cell 7]: ## ­ƒôë Step 4: Training & Verification (F1-Score Optimization with AAM-Softmax)
+Fine-tune the ECAPA-TDNN model utilizing the margin-enforcing **AAM-Softmax loss** to boost angular feature separation.
+  ---
+  [CODE cell 8]: class AAMSoftmax(nn.Module):
+    def __init__(self, input_dim, num_classes, margin=0.2, scale=30.0):
+        super().__init__()
+        self.margin = margin
+        self.scale = scale
+        self.weight = nn.Parameter(torch.FloatTensor(num_classes, input_dim))
+        nn.init.xavier_uniform_(self.weight)
+        self.cos_m = math.cos(margin)
+        self.sin_m = math.sin(margin)
+        self.th = math.cos(math.pi - margin)
+        self.mm = math.sin(math.pi - margin) * margin
+
+    def forward(s
+  ---
+  [MARKDOWN cell 9]: ## ­ƒôè Step 5: Test Set Evaluation & Visualization
+  ---
+  [CODE cell 10]: ckpt = 'checkpoints/ecapa_finetune/best_model.pt'
+if os.path.exists(ckpt):
+    c = torch.load(ckpt, map_location=device, weights_only=False)
+    eval_model = PretrainedECAPAWrapper(sb_classifier, NUM_CLASSES, 192)
+    eval_model.load_state_dict(c['model_state_dict'])
+    eval_model = eval_model.to(device)
+    opt_threshold = c['optimal_threshold']
+    print(f'Best model restored. Threshold: {opt_threshold:.3f}')
+else:
+    eval_model = model; opt_threshold = 0.5
+
+tr = eval_verif(eval_model, test_
+  ---
+  [MARKDOWN cell 11]: ## ­ƒöè Step 5.5: Fixed SNR Noisy Audio Evaluation
+  ---
+  [CODE cell 12]: def eval_verif_noise(mdl, pairs, dev, snr_val):
+    mdl.eval()
+    sims, labs = [], []
+    cache = {}
+    for a, b, lb in tqdm(pairs, desc=f'Evaluating {snr_val}dB'):
+        for f in [a, b]:
+            if f not in cache:
+                try:
+                    w, _ = librosa.load(f, sr=16000)
+                except Exception:
+                    w = np.zeros(48000, dtype=np.float32)
+                ns = 48000
+                if len(w) < ns: w = np.pad(w, (0, ns-len(w)))
+                else: 
+  ---
+  [MARKDOWN cell 13]: ## ­ƒÆ¥ Step 6: Export Model for Comparison
+  ---
+  [CODE cell 14]: torch.save({
+    'model_architecture': 'PretrainedECAPAWrapper',
+    'embedding_dim': 192, 'num_classes': NUM_CLASSES,
+    'optimal_threshold': opt_threshold,
+    'model_state_dict': eval_model.state_dict(),
+    'spk_to_label': spk_to_label, 'label_to_spk': label_to_spk,
+    'test_metrics': {'f1_score':tf1, 'eer':tr['eer'], 'accuracy':tacc,
+                     'precision':tprec, 'recall':trec, 'auc':tauc}
+}, 'results/ecapa_tdnn_final_model.pt', weights_only=False)
+print('[SUCCESS] Fine-tuned EC
+  ---

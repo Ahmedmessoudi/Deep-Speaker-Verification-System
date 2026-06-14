@@ -99,3 +99,6 @@ test_pairs.txt
 Musan.zip
 Voxceleb/
 Voxceleb*.zip
+
+#Models
+models/

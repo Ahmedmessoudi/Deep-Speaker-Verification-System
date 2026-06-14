@@ -1,5 +1,6 @@
-"""__init__ file for src module."""
+"""Core package for the speaker verification project.
 
-from . import data, evaluation, inference, models, training, utils
+The runtime containers import concrete submodules directly to avoid
+pulling training-only dependencies into the API process.
+"""
 
-__all__ = ["data", "models", "training", "evaluation", "inference", "utils"]

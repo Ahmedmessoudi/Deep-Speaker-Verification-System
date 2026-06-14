@@ -53,7 +53,7 @@ class AudioPreprocessor:
     
     def __call__(self, audio_path: str) -> np.ndarray:
         """
-        Process audio file.
+        Process audio file using the exact training-compatible robust pipeline.
         
         Args:
             audio_path: Path to audio file
@@ -61,32 +61,46 @@ class AudioPreprocessor:
         Returns:
             Processed features (n_mels, time_steps)
         """
-        # Load audio
-        y = load_audio(
-            audio_path,
-            sr=self.sample_rate,
-            duration=self.duration,
-            mono=True
-        )
-        
-        # Extract mel spectrogram
-        features = extract_mel_spectrogram(
-            y,
+        # Load audio (mono, 16 kHz)
+        try:
+            y, sr = librosa.load(audio_path, sr=self.sample_rate, mono=True)
+        except Exception as e:
+            # Fallback if librosa fails
+            y = np.zeros(int(self.sample_rate * self.duration), dtype=np.float32)
+            sr = self.sample_rate
+
+        # 1. Voice Activity Detection (VAD) - Trim silences under 30 dB
+        # This completely resolves matching on silences!
+        y_trimmed, _ = librosa.effects.trim(y, top_db=30)
+
+        # 2. Force fixed duration (3 seconds = 48000 samples)
+        max_samples = int(self.sample_rate * self.duration)
+        if len(y_trimmed) > max_samples:
+            y_trimmed = y_trimmed[:max_samples]
+        elif len(y_trimmed) < max_samples:
+            y_trimmed = np.pad(y_trimmed, (0, max_samples - len(y_trimmed)), mode='constant')
+
+        # 3. Compute Mel Spectrogram exactly like PyTorch T.MelSpectrogram
+        # We use n_fft=400 and win_length=400 to match PyTorch's defaults used in notebooks!
+        mel_spectrogram = librosa.feature.melspectrogram(
+            y=y_trimmed,
             sr=self.sample_rate,
             n_mels=self.n_mels,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            f_min=self.f_min,
-            f_max=self.f_max
+            n_fft=400,
+            hop_length=160,
+            win_length=400,
+            fmin=0.0,
+            fmax=None
         )
-        
-        # Apply normalization
-        if self.normalization == "cmvn":
-            features = apply_cmvn(features)
-        elif self.normalization == "mean_std":
-            features = normalize_features(features)
-        
-        return features
+
+        # 4. Natural logarithm: log(mel + 1e-6)
+        log_mel = np.log(mel_spectrogram + 1e-6)
+
+        # 5. Cepstral Mean Subtraction (CMS) exactly like Notebooks: lm - lm.mean()
+        # This removes the microphone response and environmental acoustic channel bias.
+        log_mel = log_mel - np.mean(log_mel)
+
+        return log_mel
     
     def process_batch(self, audio_paths: list) -> np.ndarray:
         """

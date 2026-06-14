@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Env and secrets
+.env
+.env.*
+
+# Large data and checkpoints - excluded from Docker context
+checkpoints_mini/
+checkpoints/
+Models/
+logs/
+notebooks/
+
+# Raw and processed datasets (keep small sample dir)
+data/musan/
+data/raw*
+data/augmented*
+
+# Large model weights
+*.pt
+*.pth
+
+# Do NOT ignore musan_samples if you create a small subset for the container
+!data/musan_samples/

@@ -17,7 +17,7 @@ class SpeakerVerificationInference:
         self,
         model: torch.nn.Module,
         device: str = "cpu",
-        threshold: float = 0.5
+        threshold: float = 0.75  # Calibré pour AAM-Softmax + cosine similarity L2-normalisée
     ):
         """
         Initialize inference pipeline.

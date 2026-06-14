@@ -1,0 +1,28 @@
+SPEAKER VERIFICATION - MODEL COMPARISON SUMMARY
+============================================================
+
+HARDWARE EFFICIENCY
+             Metric  X-Vector ECAPA-TDNN
+         Parameters 5,240,911  6,801,915
+          File Size   20.1 MB    26.1 MB
+       Latency/clip  112.5 ms     6.5 ms
+Peak GPU Mem (B=32)    242 MB     426 MB
+
+VERIFICATION ACCURACY (Clean)
+   Metric X-Vector ECAPA-TDNN
+ F1-Score   0.8520     0.9537
+      EER   0.1440     0.0453
+ Accuracy   0.8460     0.9540
+Precision   0.8200     0.9608
+   Recall   0.8867     0.9467
+
+NOISE ROBUSTNESS
+       Environment X-Vector F1 ECAPA-TDNN F1 X-Vector EER ECAPA-TDNN EER
+    Clean Baseline      0.8520        0.9537       0.1440         0.0453
+   SNR 20 dB (Low)      0.8531        0.9502       0.1440         0.0520
+SNR 10 dB (Medium)      0.8407        0.9382       0.1613         0.0587
+  SNR 0 dB (Heavy)      0.7997        0.8559       0.2080         0.1067
+
+Accuracy Winner: ECAPA-TDNN
+EER Winner: ECAPA-TDNN
+Noise Robustness Winner: ECAPA-TDNN
